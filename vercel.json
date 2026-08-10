@@ -1,8 +1,16 @@
 {
-  "rewrites": [
+  "cleanUrls": false,
+  "routes": [
     {
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
+      "src": "/google950dbc0d632cbde7.html",
+      "dest": "/google950dbc0d632cbde7.html"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
