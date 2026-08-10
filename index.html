@@ -116,7 +116,7 @@
     <!-- ========================================== -->
     <!-- VIEW 1: LANDING & PAYWALL SCREEN (Default) -->
     <!-- ========================================== -->
-    <main id="paywall-view" class="flex-1 flex flex-col p-4 space-y-6">
+    <main id="paywall-view" class="hidden flex-1 flex flex-col p-4 space-y-6">
 
       <!-- Hero Value Pitch -->
       <section class="text-center pt-2 space-y-3">
@@ -300,7 +300,7 @@
     <!-- ========================================== -->
     <!-- VIEW 3: MAIN UNLOCKED APP DASHBOARD        -->
     <!-- ========================================== -->
-    <main id="app-view" class="hidden flex-1 flex flex-col p-4 space-y-5">
+    <main id="app-view" class="flex-1 flex flex-col p-4 space-y-5">
 
       <!-- STREAK & MOTIVATION BANNER -->
       <div id="streak-banner" class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-3 rounded-2xl shadow-md flex items-center justify-between">
@@ -883,13 +883,7 @@
             </button>
           </form>
 
-          <!-- Guest option -->
-          <div class="pt-2 border-t border-slate-100 text-center">
-            <button onclick="handleGuestSignIn()" class="text-xs font-bold text-slate-500 hover:text-slate-800 transition flex items-center justify-center gap-1.5 mx-auto">
-              <i data-lucide="user-check" class="w-4 h-4 text-slate-400"></i>
-              <span>Continue as Guest (Private Local Mode)</span>
-            </button>
-          </div>
+
         </div>
 
         <!-- Authenticated Profile View -->
@@ -1081,6 +1075,7 @@
     // APP STATE & LOCALSTORAGE
     // --------------------------------------------------
     let isUnlocked = true; // Open freely
+    let isUserPaid = true; // Default unlocked access
     let transactions = []; // Strict privacy: empty until authenticated
     let savingsGoal = 10000;
     let monthlyExpenseBudget = 30000;
@@ -1108,6 +1103,11 @@
       if (window.firebase) {
         firebaseApp = firebase.initializeApp(firebaseConfig);
         firebaseAuth = firebase.auth();
+        if (firebaseAuth && firebase.auth && firebase.auth.Auth && firebase.auth.Auth.Persistence) {
+          firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(err => {
+            console.warn("Auth persistence configuration note:", err);
+          });
+        }
         try {
           firebaseDb = firebase.firestore(firebaseApp, "ai-studio-spendly-07fa4dd9-394d-4b97-b4d1-8446ebabd498");
         } catch (e) {
@@ -1583,6 +1583,24 @@
       renderCategoryGrid();
       setMockupTab('entry');
       
+      // Close modal on backdrop click
+      document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('fixed') && e.target.classList.contains('inset-0')) {
+          e.target.classList.add('hidden');
+        }
+      });
+
+      // Close modal on Escape key press, submit on Enter
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const modals = document.querySelectorAll('.fixed.inset-0:not(.hidden)');
+          modals.forEach(modal => modal.classList.add('hidden'));
+        }
+        if (e.key === 'Enter' && e.target && (e.target.id === 'entry-amount' || e.target.id === 'entry-note')) {
+          saveTransaction();
+        }
+      });
+
       // Directly open full main app freely
       showView('app-view');
       renderAppViews();
@@ -1595,6 +1613,23 @@
         checkMonthlyRecurringPrompt();
       }, 400);
     });
+
+    function showToast(message, type = 'success') {
+      let toast = document.getElementById('app-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-toast';
+        document.body.appendChild(toast);
+      }
+      toast.innerText = message;
+      toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xl transition-all transform opacity-100 duration-300 flex items-center gap-2 ${type === 'error' ? 'bg-rose-600' : 'bg-slate-900'}`;
+      
+      setTimeout(() => {
+        if (toast) {
+          toast.className = `fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xl transition-all transform opacity-0 pointer-events-none duration-300 flex items-center gap-2 ${type === 'error' ? 'bg-rose-600' : 'bg-slate-900'}`;
+        }
+      }, 2200);
+    }
 
     function showView(viewId) {
       document.getElementById('paywall-view').classList.add('hidden');
@@ -1879,6 +1914,7 @@
 
       renderAppViews();
       if (historyViewMode === 'recurring') renderRecurringView();
+      showToast(currentEntryType === 'income' ? 'Income added successfully! ✨' : 'Expense recorded! 💸');
     }
 
     function deleteTransaction(id) {
@@ -1891,6 +1927,7 @@
         localStorage.setItem('myspends_items_' + currentUser.uid, JSON.stringify(transactions));
         removeTransactionFromCloud(id);
         renderAppViews();
+        showToast('Transaction removed', 'error');
       }
     }
 
@@ -1989,10 +2026,11 @@
 
       const statusBox = document.getElementById('voice-status');
       const statusText = document.getElementById('voice-status-text');
-      statusBox.classList.remove('hidden');
-      statusText.innerText = "Listening... Speak now (e.g. '500 Food')";
+      if (statusBox) statusBox.classList.remove('hidden');
+      if (statusText) statusText.innerText = "Listening... Speak now (e.g. '500 Food')";
 
-      document.getElementById('voice-btn').classList.add('mic-pulsing', 'bg-rose-100');
+      const voiceBtn = document.getElementById('voice-btn');
+      if (voiceBtn) voiceBtn.classList.add('mic-pulsing', 'bg-rose-100');
 
       recognition = new SpeechRecognition();
       recognition.lang = 'en-IN';
@@ -2001,13 +2039,13 @@
 
       recognition.onresult = function(event) {
         const transcript = event.results[0][0].transcript.toLowerCase();
-        statusText.innerText = `Heard: "${transcript}"`;
+        if (statusText) statusText.innerText = `Heard: "${transcript}"`;
         parseVoiceTranscript(transcript);
         stopVoicePulsing();
       };
 
       recognition.onerror = function(event) {
-        statusText.innerText = "Voice input failed. Please try again.";
+        if (statusText) statusText.innerText = "Voice input failed. Please try again.";
         stopVoicePulsing();
       };
 
@@ -2019,24 +2057,31 @@
     }
 
     function stopVoicePulsing() {
-      document.getElementById('voice-btn').classList.remove('mic-pulsing', 'bg-rose-100');
+      const btn = document.getElementById('voice-btn');
+      if (btn) btn.classList.remove('mic-pulsing', 'bg-rose-100');
     }
 
     function cancelVoiceInput() {
       if (recognition) recognition.stop();
-      document.getElementById('voice-status').classList.add('hidden');
+      const statusBox = document.getElementById('voice-status');
+      if (statusBox) statusBox.classList.add('hidden');
       stopVoicePulsing();
     }
 
     function parseVoiceTranscript(text) {
+      const amtElem = document.getElementById('entry-amount');
+      const noteElem = document.getElementById('entry-note');
+
       // 1. Extract amount numbers
       const matches = text.match(/\d+/g);
-      if (matches && matches.length > 0) {
-        document.getElementById('entry-amount').value = matches[0];
-      } else {
-        if (text.includes("hundred")) document.getElementById('entry-amount').value = 100;
-        else if (text.includes("five hundred")) document.getElementById('entry-amount').value = 500;
-        else if (text.includes("thousand")) document.getElementById('entry-amount').value = 1000;
+      if (amtElem) {
+        if (matches && matches.length > 0) {
+          amtElem.value = matches[0];
+        } else {
+          if (text.includes("hundred")) amtElem.value = 100;
+          else if (text.includes("five hundred")) amtElem.value = 500;
+          else if (text.includes("thousand")) amtElem.value = 1000;
+        }
       }
 
       // 2. Category Keywords Matching
@@ -2062,16 +2107,57 @@
       }
 
       // 3. Set note as transcript text
-      document.getElementById('entry-note').value = text;
+      if (noteElem) noteElem.value = text;
     }
 
     // --------------------------------------------------
-    // RENDERING DASHBOARD DATA & HISTORY
+    // RENDERING DASHBOARD DATA & HISTORY (Debounced & Memoized)
     // --------------------------------------------------
-    function renderAppViews() {
+    let renderAppViewsTimer = null;
+    let lastAppViewsHash = "";
+    let lastTxListHash = "";
+
+    function renderAppViews(force = false) {
+      if (force) {
+        if (renderAppViewsTimer) {
+          cancelAnimationFrame(renderAppViewsTimer);
+          renderAppViewsTimer = null;
+        }
+        renderAppViewsCore(true);
+        return;
+      }
+
+      if (renderAppViewsTimer) return;
+      renderAppViewsTimer = requestAnimationFrame(() => {
+        renderAppViewsTimer = null;
+        renderAppViewsCore(false);
+      });
+    }
+
+    function renderAppViewsCore(force = false) {
+      const monthPicker = document.getElementById('month-picker');
+      const selectedMonth = (monthPicker && monthPicker.value) ? monthPicker.value : new Date().toISOString().slice(0, 7);
+      
+      const currentHashParts = [
+        currentUser ? currentUser.uid : 'anon',
+        historyViewMode,
+        selectedMonth,
+        savingsGoal,
+        monthlyExpenseBudget,
+        isUserPaid,
+        transactions.length,
+        transactions.slice(0, 10).map(t => `${t.id}_${t.amount}_${t.date}_${t.type}`).join('|')
+      ];
+      const currentStateHash = currentHashParts.join('::');
+
+      if (!force && currentStateHash === lastAppViewsHash) {
+        return; // Skip redundant DOM renders if state is identical
+      }
+      lastAppViewsHash = currentStateHash;
+
       renderSummaryCards();
       renderBudgetStatus();
-      renderTransactionsList();
+      renderTransactionsList(force);
       renderStreakAndGoal();
       populateMonthPicker();
       if (historyViewMode === 'charts') {
@@ -2098,9 +2184,13 @@
       const expense = monthItems.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
       const balance = income - expense;
 
-      document.getElementById('summary-income').innerText = `₹${income.toLocaleString('en-IN')}`;
-      document.getElementById('summary-expense').innerText = `₹${expense.toLocaleString('en-IN')}`;
-      document.getElementById('summary-balance').innerText = `₹${balance.toLocaleString('en-IN')}`;
+      const incEl = document.getElementById('summary-income');
+      const expEl = document.getElementById('summary-expense');
+      const balEl = document.getElementById('summary-balance');
+
+      if (incEl) incEl.innerText = `₹${income.toLocaleString('en-IN')}`;
+      if (expEl) expEl.innerText = `₹${expense.toLocaleString('en-IN')}`;
+      if (balEl) balEl.innerText = `₹${balance.toLocaleString('en-IN')}`;
     }
 
     function renderBudgetStatus() {
@@ -2194,40 +2284,52 @@
 
     function setHistoryView(mode) {
       historyViewMode = mode;
-      document.getElementById('tab-today').className = "px-2.5 py-1 rounded-lg hover:text-slate-900";
-      document.getElementById('tab-month').className = "px-2.5 py-1 rounded-lg hover:text-slate-900";
-      document.getElementById('tab-recurring').className = "px-2.5 py-1 rounded-lg hover:text-slate-900 flex items-center gap-1";
-      document.getElementById('tab-charts').className = "px-2.5 py-1 rounded-lg hover:text-slate-900 flex items-center gap-1";
+      const tToday = document.getElementById('tab-today');
+      const tMonth = document.getElementById('tab-month');
+      const tRec = document.getElementById('tab-recurring');
+      const tCharts = document.getElementById('tab-charts');
 
-      if (mode === 'today') document.getElementById('tab-today').className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs";
-      if (mode === 'month') document.getElementById('tab-month').className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs";
-      if (mode === 'recurring') document.getElementById('tab-recurring').className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs flex items-center gap-1";
-      if (mode === 'charts') document.getElementById('tab-charts').className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs flex items-center gap-1";
+      if (tToday) tToday.className = "px-2.5 py-1 rounded-lg hover:text-slate-900";
+      if (tMonth) tMonth.className = "px-2.5 py-1 rounded-lg hover:text-slate-900";
+      if (tRec) tRec.className = "px-2.5 py-1 rounded-lg hover:text-slate-900 flex items-center gap-1";
+      if (tCharts) tCharts.className = "px-2.5 py-1 rounded-lg hover:text-slate-900 flex items-center gap-1";
+
+      if (mode === 'today' && tToday) tToday.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs";
+      if (mode === 'month' && tMonth) tMonth.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs";
+      if (mode === 'recurring' && tRec) tRec.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs flex items-center gap-1";
+      if (mode === 'charts' && tCharts) tCharts.className = "px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-2xs flex items-center gap-1";
+
+      const txList = document.getElementById('transactions-list-container');
+      const recView = document.getElementById('recurring-view-container');
+      const chartsView = document.getElementById('charts-view-container');
 
       if (mode === 'charts') {
-        document.getElementById('transactions-list-container').classList.add('hidden');
-        document.getElementById('recurring-view-container').classList.add('hidden');
-        document.getElementById('charts-view-container').classList.remove('hidden');
+        if (txList) txList.classList.add('hidden');
+        if (recView) recView.classList.add('hidden');
+        if (chartsView) chartsView.classList.remove('hidden');
         renderCashflowChart();
         renderCategoryBreakdown();
       } else if (mode === 'recurring') {
-        document.getElementById('transactions-list-container').classList.add('hidden');
-        document.getElementById('charts-view-container').classList.add('hidden');
-        document.getElementById('recurring-view-container').classList.remove('hidden');
+        if (txList) txList.classList.add('hidden');
+        if (chartsView) chartsView.classList.add('hidden');
+        if (recView) recView.classList.remove('hidden');
         renderRecurringView();
       } else {
-        document.getElementById('charts-view-container').classList.add('hidden');
-        document.getElementById('recurring-view-container').classList.add('hidden');
-        document.getElementById('transactions-list-container').classList.remove('hidden');
+        if (chartsView) chartsView.classList.add('hidden');
+        if (recView) recView.classList.add('hidden');
+        if (txList) txList.classList.remove('hidden');
         renderTransactionsList();
       }
     }
 
-    function renderTransactionsList() {
+    function renderTransactionsList(force = false) {
       const container = document.getElementById('transactions-list-container');
       if (!container) return;
 
       if (!currentUser) {
+        const noUserKey = "no_user";
+        if (!force && lastTxListHash === noUserKey) return;
+        lastTxListHash = noUserKey;
         container.innerHTML = `
           <div class="p-6 text-center bg-white rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
             <div class="w-10 h-10 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto">
@@ -2259,6 +2361,12 @@
       } else if (historyViewMode === 'month') {
         filtered = transactions.filter(t => t.date.startsWith(selectedMonth));
       }
+
+      const currentListHash = `${currentUser.uid}_${historyViewMode}_${selectedMonth}_${filtered.length}_` + filtered.map(t => `${t.id}_${t.amount}_${t.date}_${t.type}_${t.note}`).join('|');
+      if (!force && lastTxListHash === currentListHash) {
+        return; // List is identical, skip DOM rewrite
+      }
+      lastTxListHash = currentListHash;
 
       if (filtered.length === 0) {
         container.innerHTML = `
@@ -2319,15 +2427,18 @@
       const uniqueDates = [...new Set(transactions.map(t => t.date))].sort().reverse();
       const streakCount = uniqueDates.length;
 
-      document.getElementById('streak-count').innerText = streakCount;
+      const streakEl = document.getElementById('streak-count');
+      if (streakEl) streakEl.innerText = streakCount;
 
       const streakMsg = document.getElementById('streak-message');
-      if (streakCount >= 30) {
-        streakMsg.innerText = "Amazing! 30 days streak! You mastered financial discipline!";
-      } else if (streakCount >= 7) {
-        streakMsg.innerText = "7 days streak accomplished! Keep saving!";
-      } else {
-        streakMsg.innerText = "Great start! Track daily to build a savings habit.";
+      if (streakMsg) {
+        if (streakCount >= 30) {
+          streakMsg.innerText = "Amazing! 30 days streak! You mastered financial discipline!";
+        } else if (streakCount >= 7) {
+          streakMsg.innerText = "7 days streak accomplished! Keep saving!";
+        } else {
+          streakMsg.innerText = "Great start! Track daily to build a savings habit.";
+        }
       }
 
       // Savings goal calculation for current month
@@ -2340,22 +2451,34 @@
 
       const pct = Math.min(100, Math.round((netSavings / savingsGoal) * 100));
 
-      document.getElementById('goal-progress-text').innerText = `₹${netSavings.toLocaleString('en-IN')} saved / ₹${savingsGoal.toLocaleString('en-IN')} goal`;
-      document.getElementById('goal-percent-text').innerText = `${pct}%`;
-      document.getElementById('goal-progress-bar').style.width = `${pct}%`;
+      const goalTxt = document.getElementById('goal-progress-text');
+      const goalPct = document.getElementById('goal-percent-text');
+      const goalBar = document.getElementById('goal-progress-bar');
+
+      if (goalTxt) goalTxt.innerText = `₹${netSavings.toLocaleString('en-IN')} saved / ₹${savingsGoal.toLocaleString('en-IN')} goal`;
+      if (goalPct) goalPct.innerText = `${pct}%`;
+      if (goalBar) goalBar.style.width = `${pct}%`;
     }
 
     function openGoalModal() {
-      document.getElementById('goal-input-amount').value = savingsGoal;
-      document.getElementById('budget-input-amount').value = monthlyExpenseBudget;
-      document.getElementById('goal-modal').classList.remove('hidden');
+      const gInput = document.getElementById('goal-input-amount');
+      const bInput = document.getElementById('budget-input-amount');
+      const modal = document.getElementById('goal-modal');
+
+      if (gInput) gInput.value = savingsGoal;
+      if (bInput) bInput.value = monthlyExpenseBudget;
+      if (modal) modal.classList.remove('hidden');
     }
     function closeGoalModal() {
-      document.getElementById('goal-modal').classList.add('hidden');
+      const modal = document.getElementById('goal-modal');
+      if (modal) modal.classList.add('hidden');
     }
     function saveGoalAndBudgetAmount() {
-      const goalVal = parseInt(document.getElementById('goal-input-amount').value, 10);
-      const budgetVal = parseInt(document.getElementById('budget-input-amount').value, 10);
+      const gInput = document.getElementById('goal-input-amount');
+      const bInput = document.getElementById('budget-input-amount');
+
+      const goalVal = gInput ? parseInt(gInput.value, 10) : 0;
+      const budgetVal = bInput ? parseInt(bInput.value, 10) : 0;
 
       if (goalVal && goalVal > 0) {
         savingsGoal = goalVal;
@@ -2793,9 +2916,12 @@
     function showImportModal(title, desc, progress) {
       const modal = document.getElementById('import-loading-modal');
       if (!modal) return;
-      document.getElementById('import-modal-title').innerText = title;
-      document.getElementById('import-modal-desc').innerText = desc;
-      document.getElementById('import-modal-progress').style.width = `${progress}%`;
+      const titleEl = document.getElementById('import-modal-title');
+      const descEl = document.getElementById('import-modal-desc');
+      const progEl = document.getElementById('import-modal-progress');
+      if (titleEl) titleEl.innerText = title;
+      if (descEl) descEl.innerText = desc;
+      if (progEl) progEl.style.width = `${progress}%`;
       modal.classList.remove('hidden');
     }
 
@@ -3433,9 +3559,11 @@
       const d = new Date();
       const monthName = monthNames[d.getMonth()] + " " + d.getFullYear();
 
-      document.getElementById('prompt-month-subtitle').innerText = `${monthName} Fixed Expenses`;
+      const monthSub = document.getElementById('prompt-month-subtitle');
+      if (monthSub) monthSub.innerText = `${monthName} Fixed Expenses`;
 
       const checklist = document.getElementById('prompt-recurring-checklist');
+      if (!checklist) return;
       checklist.innerHTML = pendingTemplates.map(item => {
         const catObj = CATEGORIES.find(c => c.id === item.category) || CATEGORIES[9];
         return `
@@ -3458,7 +3586,8 @@
       }).join('');
 
       lucide.createIcons();
-      document.getElementById('recurring-prompt-modal').classList.remove('hidden');
+      const promptModal = document.getElementById('recurring-prompt-modal');
+      if (promptModal) promptModal.classList.remove('hidden');
     }
 
     function closeRecurringPromptModal(dismissForMonth = false) {
@@ -3466,7 +3595,8 @@
         const currentMonthStr = new Date().toISOString().slice(0, 7);
         localStorage.setItem('myspends_recurring_dismissed_' + currentUser.uid + '_' + currentMonthStr, 'true');
       }
-      document.getElementById('recurring-prompt-modal').classList.add('hidden');
+      const promptModal = document.getElementById('recurring-prompt-modal');
+      if (promptModal) promptModal.classList.add('hidden');
     }
 
     function addSelectedRecurringPromptItems() {
@@ -3625,15 +3755,20 @@
 
     function openAddRecurringModal() {
       const catSelect = document.getElementById('rec-category');
-      catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      document.getElementById('rec-amount').value = '';
-      document.getElementById('rec-note').value = '';
+      const recAmt = document.getElementById('rec-amount');
+      const recNote = document.getElementById('rec-note');
+      const modal = document.getElementById('add-recurring-modal');
+
+      if (catSelect) catSelect.innerHTML = CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      if (recAmt) recAmt.value = '';
+      if (recNote) recNote.value = '';
       setRecModalType('expense');
-      document.getElementById('add-recurring-modal').classList.remove('hidden');
+      if (modal) modal.classList.remove('hidden');
     }
 
     function closeAddRecurringModal() {
-      document.getElementById('add-recurring-modal').classList.add('hidden');
+      const modal = document.getElementById('add-recurring-modal');
+      if (modal) modal.classList.add('hidden');
     }
 
     function setRecModalType(type) {
@@ -3641,11 +3776,11 @@
       const bExp = document.getElementById('rec-type-btn-expense');
       const bInc = document.getElementById('rec-type-btn-income');
       if (type === 'expense') {
-        bExp.className = "py-1.5 rounded-lg font-bold bg-rose-600 text-white text-center";
-        bInc.className = "py-1.5 rounded-lg font-bold bg-slate-100 text-slate-600 text-center";
+        if (bExp) bExp.className = "py-1.5 rounded-lg font-bold bg-rose-600 text-white text-center";
+        if (bInc) bInc.className = "py-1.5 rounded-lg font-bold bg-slate-100 text-slate-600 text-center";
       } else {
-        bInc.className = "py-1.5 rounded-lg font-bold bg-emerald-600 text-white text-center";
-        bExp.className = "py-1.5 rounded-lg font-bold bg-slate-100 text-slate-600 text-center";
+        if (bInc) bInc.className = "py-1.5 rounded-lg font-bold bg-emerald-600 text-white text-center";
+        if (bExp) bExp.className = "py-1.5 rounded-lg font-bold bg-slate-100 text-slate-600 text-center";
       }
     }
 
