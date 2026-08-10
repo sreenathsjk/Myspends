@@ -1,0 +1,6 @@
+{
+  "name": "MySpends",
+  "description": "Daily expense and income tracker with English voice input, category tracking, offline storage, cashflow charts, and PDF exports.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

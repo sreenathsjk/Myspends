@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid"]
+    },
+    "transactions": {
+      "title": "User Transaction",
+      "description": "Expense or income transaction belonging to a specific user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "note": { "type": "string" },
+        "isRecurring": { "type": "boolean" }
+      },
+      "required": ["userId", "date", "type", "category", "amount"]
+    },
+    "settings": {
+      "title": "User Settings",
+      "description": "Budget and goal settings per user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "savingsGoal": { "type": "number" },
+        "monthlyBudget": { "type": "number" },
+        "dailyReminder": { "type": "boolean" },
+        "reminderTime": { "type": "string" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "securityRules": [
+    {
+      "collection": "users",
+      "match": "/users/{userId}",
+      "rules": {
+        "read": "request.auth != null && request.auth.uid == userId",
+        "write": "request.auth != null && request.auth.uid == userId"
+      }
+    },
+    {
+      "collection": "transactions",
+      "match": "/transactions/{transactionId}",
+      "rules": {
+        "read": "request.auth != null && resource.data.userId == request.auth.uid",
+        "create": "request.auth != null && request.resource.data.userId == request.auth.uid",
+        "update": "request.auth != null && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid",
+        "delete": "request.auth != null && resource.data.userId == request.auth.uid"
+      }
+    },
+    {
+      "collection": "settings",
+      "match": "/settings/{userId}",
+      "rules": {
+        "read": "request.auth != null && request.auth.uid == userId",
+        "write": "request.auth != null && request.auth.uid == userId"
+      }
+    }
+  ]
+}
