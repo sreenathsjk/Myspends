@@ -1447,10 +1447,6 @@
     }
 
     function showView(viewId = 'app-view') {
-      const pw = document.getElementById('paywall-view');
-      if (pw) pw.classList.add('hidden');
-      const pp = document.getElementById('post-payment-view');
-      if (pp) pp.classList.add('hidden');
       const app = document.getElementById('app-view');
       if (app) app.classList.remove('hidden');
 
@@ -1578,8 +1574,7 @@
       localStorage.setItem('kharcha_unlocked', 'true');
       localStorage.setItem('kharcha_order_id', orderId);
 
-      document.getElementById('success-order-id').innerText = orderId;
-      showView('post-payment-view');
+      showView('app-view');
 
       // Confetti celebration
       if (window.confetti) {
