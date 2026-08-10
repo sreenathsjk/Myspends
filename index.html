@@ -1661,9 +1661,17 @@
     // Save Entry
     async function saveTransaction() {
       if (!currentUser) {
-        openAuthModal();
-        alert("Please sign in or create an account to record your income and expenses.");
-        return;
+        if (firebaseAuth) {
+          try {
+            const userCred = await firebaseAuth.signInAnonymously();
+            currentUser = userCred.user;
+          } catch (e) {
+            console.warn("Auto guest sign in note:", e);
+            currentUser = { uid: 'guest_' + Date.now(), isAnonymous: true, email: null, displayName: 'Guest' };
+          }
+        } else {
+          currentUser = { uid: 'guest_' + Date.now(), isAnonymous: true, email: null, displayName: 'Guest' };
+        }
       }
 
       if (!isUserPaid) {
@@ -3616,6 +3624,55 @@
 
       alert("Recurring expense template added!");
     }
+
+    // Expose all global functions explicitly on window
+    window.saveTransaction = saveTransaction;
+    window.openAuthModal = openAuthModal;
+    window.closeAuthModal = closeAuthModal;
+    window.setAuthTab = setAuthTab;
+    window.handleGoogleSignIn = handleGoogleSignIn;
+    window.handleEmailAuthSubmit = handleEmailAuthSubmit;
+    window.handleForgotPassword = handleForgotPassword;
+    window.handleGuestSignIn = handleGuestSignIn;
+    window.handleSignOut = handleSignOut;
+    window.setEntryType = setEntryType;
+    window.selectCategory = selectCategory;
+    window.startVoiceInput = startVoiceInput;
+    window.cancelVoiceInput = cancelVoiceInput;
+    window.setHistoryView = setHistoryView;
+    window.openGoalModal = openGoalModal;
+    window.closeGoalModal = closeGoalModal;
+    window.saveGoalAndBudgetAmount = saveGoalAndBudgetAmount;
+    window.exportMonthlyPDF = exportMonthlyPDF;
+    window.exportCSV = exportCSV;
+    window.handleFileImport = handleFileImport;
+    window.closeImportPreviewModal = closeImportPreviewModal;
+    window.toggleSelectAllImportItems = toggleSelectAllImportItems;
+    window.addNewBlankImportRow = addNewBlankImportRow;
+    window.confirmSelectedImportItems = confirmSelectedImportItems;
+    window.updatePendingImportItem = updatePendingImportItem;
+    window.deletePendingImportRow = deletePendingImportRow;
+    window.openAddRecurringModal = openAddRecurringModal;
+    window.closeAddRecurringModal = closeAddRecurringModal;
+    window.setRecModalType = setRecModalType;
+    window.saveNewRecurringTemplate = saveNewRecurringTemplate;
+    window.closeRecurringPromptModal = closeRecurringPromptModal;
+    window.addSelectedRecurringPromptItems = addSelectedRecurringPromptItems;
+    window.logSingleRecurringItem = logSingleRecurringItem;
+    window.toggleRecurringActive = toggleRecurringActive;
+    window.deleteRecurringTemplate = deleteRecurringTemplate;
+    window.openEditTransactionModal = openEditTransactionModal;
+    window.closeEditTransactionModal = closeEditTransactionModal;
+    window.saveEditedTransaction = saveEditedTransaction;
+    window.deleteTransaction = deleteTransaction;
+    window.openRazorpayModal = openRazorpayModal;
+    window.closeRazorpayModal = closeRazorpayModal;
+    window.triggerRazorpayCheckout = triggerRazorpayCheckout;
+    window.showRestoreModal = showRestoreModal;
+    window.closeRestoreModal = closeRestoreModal;
+    window.processRestorePurchase = processRestorePurchase;
+    window.showView = showView;
+    window.enterMainApp = enterMainApp;
   </script>
 </body>
 </html>
